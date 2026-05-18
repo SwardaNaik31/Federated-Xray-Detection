@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federated X-Ray Dashboard</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="dashboard-header">
+            <h1>Federated Learning Dashboard</h1>
+            <p class="subtitle">Monitor the live training round, global accuracy, privacy budget, and hospital status
+                for the federated X-ray model.</p>
+        </div>
+
+        <div class="cards">
+
+            <div class="card">
+                <h2>Training Round</h2>
+                <p id="round">0</p>
+                <span class="card-note">Current federated aggregation cycle.</span>
+            </div>
+
+            <div class="card">
+                <h2>Global Accuracy</h2>
+                <p id="accuracy">0%</p>
+                <span class="card-note">Latest validation score from the global model.</span>
+            </div>
+
+            <div class="card">
+                <h2>Privacy Budget</h2>
+                <p id="privacy">ε = 1.1</p>
+                <span class="card-note">Differential privacy budget for training.</span>
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+            <h2>Accuracy Trend</h2>
+            <canvas id="accuracyChart"></canvas>
+            <p id="chartStatus" class="chart-status">Waiting for metric data...</p>
+            <p class="chart-note">This graph shows how accuracy changes across rounds. It updates when the server
+                reports a new round.</p>
+        </div>
+
+        <div class="hospitals">
+            <div class="hospital">
+                <h3>Hospital A</h3>
+                <p>Status: <span id="hospitalA" class="status status-training">Training</span></p>
+            </div>
+            <div class="hospital">
+                <h3>Hospital B</h3>
+                <p>Status: <span id="hospitalB" class="status status-training">Training</span></p>
+            </div>
+            <div class="hospital">
+                <h3>Hospital C</h3>
+                <p>Status: <span id="hospitalC" class="status status-training">Training</span></p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h2>X-Ray Prediction</h2>
+
+        <form action="/predict" method="POST" enctype="multipart/form-data">
+
+            <input type="file" name="file" required>
+
+            <button type="submit">
+                Predict Disease
+            </button>
+
+        </form>
+
+        {% if prediction %}
+
+        <div class="prediction-box">
+
+            <h3>Prediction:</h3>
+
+            <h2>{{ prediction }}</h2>
+
+        </div>
+
+        {% endif %}
+    </div>
+
+
+    <script>
+
+        const ctx = document.getElementById('accuracyChart').getContext('2d');
+
+        const accuracyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Accuracy',
+                    data: [],
+                    fill: true,
+                    borderColor: '#1f77b4',
+                    backgroundColor: 'rgba(31, 119, 180, 0.18)',
+                    tension: 0.25,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointHoverBorderWidth: 2,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#1f77b4',
+                    pointBorderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'nearest',
+                    intersect: false
+                },
+                plugins: {
+                    tooltip: {
+                        enabled: true,
+                        mode: 'nearest',
+                        intersect: false,
+                        backgroundColor: '#111827',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function (context) {
+                                return 'Accuracy: ' + context.parsed.y + '%';
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Round'
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Accuracy (%)'
+                        },
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.2)'
+                        }
+                    }
+                }
+            }
+        });
+
+        function updateChart(round, accuracy) {
+            const labels = accuracyChart.data.labels;
+            const values = accuracyChart.data.datasets[0].data;
+
+            if (labels.length === 0 || labels[labels.length - 1] !== round) {
+                labels.push(round);
+                values.push(accuracy);
+                accuracyChart.update();
+            }
+        }
+
+        function setStatus(elementId, status) {
+            const span = document.getElementById(elementId);
+            span.innerText = status;
+            span.className = 'status ' + (status.toLowerCase() === 'training' ? 'status-training' : 'status-idle');
+        }
+
+        function updateChart(round, accuracy) {
+            const labels = accuracyChart.data.labels;
+            const values = accuracyChart.data.datasets[0].data;
+
+            if (typeof round !== 'number' || typeof accuracy !== 'number') {
+                return;
+            }
+
+            if (labels.length === 0) {
+                labels.push(round);
+                values.push(accuracy);
+            } else if (labels[labels.length - 1] !== round) {
+                labels.push(round);
+                values.push(accuracy);
+            } else {
+                values[values.length - 1] = accuracy;
+            }
+
+            accuracyChart.update();
+        }
+
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/metrics');
+                const data = await response.json();
+
+                document.getElementById('round').innerText = data.round;
+                document.getElementById('accuracy').innerText = data.accuracy + '%';
+                document.getElementById('privacy').innerText = 'ε = ' + data.privacy_budget;
+
+                setStatus('hospitalA', data.hospital_a);
+                setStatus('hospitalB', data.hospital_b);
+                setStatus('hospitalC', data.hospital_c);
+
+                updateChart(data.round, data.accuracy);
+
+                const chartStatus = document.getElementById('chartStatus');
+                if (accuracyChart.data.labels.length === 0) {
+                    chartStatus.innerText = 'No chart data available yet.';
+                } else {
+                    chartStatus.innerText = 'Showing ' + accuracyChart.data.labels.length + ' data point' +
+                        (accuracyChart.data.labels.length === 1 ? '' : 's') +
+                        ' — latest at round ' + data.round + '.';
+                }
+            } catch (error) {
+                console.error('Unable to fetch metrics:', error);
+                document.getElementById('chartStatus').innerText = 'Unable to load chart data.';
+            }
+        }
+
+        setInterval(fetchMetrics, 2000);
+        fetchMetrics();
+
+    </script>
+
+
+</body>
+
+</html>

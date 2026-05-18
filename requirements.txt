@@ -1,0 +1,12 @@
+flwr
+torch
+torchvision
+opacus
+fastapi
+uvicorn
+numpy
+pandas
+matplotlib
+scikit-learn
+pillow
+python-multipart
