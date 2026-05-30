@@ -290,5 +290,3 @@ Confidence: 96.3%
 Academic Project – Federated Learning Based X-Ray Disease Detection System.
 
 ---
-<img width="1328" height="686" alt="ss1" src="https://github.com/user-attachments/assets/9eea7e44-d383-40ab-9dac-8408316bc24c" />
-<img width="1328" height="686" alt="ss1" src="https://github.com/user-attachments/assets/51e83573-b1d1-45f5-ab3b-474ef84d58de" />
